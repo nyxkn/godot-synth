@@ -1,6 +1,6 @@
 # Godot Synth
 
-A simple synthesizer in Godot4.
+A simple synthesizer in GDScript for Godot 4.
 
 It exists as a demonstration of how to generate sound in realtime in Godot.
 
@@ -12,6 +12,13 @@ Based on the
 ## Usage
 
 Add `synth.gd` to your scene. Call `start()` and tweak the synth parameters.
+
+If the dsp cannot keep up and the audio streams stops, you can improve performance by increasing
+the `buffer_size` or `buffer_sizes_in_advance` values, or decreasing the `sample_rate`.
+
+Performance is an issue, and the
+[Godot docs](https://docs.godotengine.org/en/stable/classes/class_audiostreamgenerator.html#description)
+also mention that GDScrpit isn't ideal for this type of work. Compiled languages might work better.
 
 ## Demo
 
