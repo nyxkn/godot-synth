@@ -1,0 +1,53 @@
+[gd_scene load_steps=4 format=3 uid="uid://n8ug64vrn286"]
+
+[ext_resource type="Script" path="res://addons/synth/gui.gd" id="1_vmfw1"]
+[ext_resource type="PackedScene" uid="uid://cfuy6m1ob8e7n" path="res://addons/synth/ui/slider.tscn" id="2_560pd"]
+[ext_resource type="PackedScene" uid="uid://t4jyo3xi7apn" path="res://addons/synth/ui/waveform_visualizer.tscn" id="3_2m81f"]
+
+[node name="GUI" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_vmfw1")
+
+[node name="VBoxContainer" type="VBoxContainer" parent="."]
+layout_mode = 0
+offset_right = 40.0
+offset_bottom = 40.0
+
+[node name="Pitch" parent="VBoxContainer" instance=ExtResource("2_560pd")]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="Waveform" parent="VBoxContainer" instance=ExtResource("2_560pd")]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="Width" parent="VBoxContainer" instance=ExtResource("2_560pd")]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="Volume" parent="VBoxContainer" instance=ExtResource("2_560pd")]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="HSeparator" type="HSeparator" parent="VBoxContainer"]
+layout_mode = 2
+
+[node name="Filter" parent="VBoxContainer" instance=ExtResource("2_560pd")]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="Cutoff" parent="VBoxContainer" instance=ExtResource("2_560pd")]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="Resonance" parent="VBoxContainer" instance=ExtResource("2_560pd")]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="Waveform" parent="." instance=ExtResource("3_2m81f")]
+position = Vector2(450, 250)

@@ -1,0 +1,41 @@
+[gd_scene load_steps=2 format=3 uid="uid://cfuy6m1ob8e7n"]
+
+[ext_resource type="Script" path="res://addons/synth/ui/slider.gd" id="1_4vxkx"]
+
+[node name="Slider" type="HBoxContainer"]
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -20.0
+offset_top = -20.0
+offset_right = 20.0
+offset_bottom = 20.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_4vxkx")
+
+[node name="Label" type="Label" parent="."]
+layout_mode = 2
+text = "Label:"
+
+[node name="HSlider" type="HSlider" parent="."]
+custom_minimum_size = Vector2(100, 0)
+layout_mode = 2
+size_flags_vertical = 4
+
+[node name="Value" type="Label" parent="."]
+visible = false
+layout_mode = 2
+text = "100"
+
+[node name="LineEdit" type="LineEdit" parent="."]
+visible = false
+layout_mode = 2
+
+[node name="SpinBox" type="SpinBox" parent="."]
+layout_mode = 2
+
+[connection signal="value_changed" from="HSlider" to="." method="_on_h_slider_value_changed"]
+[connection signal="value_changed" from="SpinBox" to="." method="_on_spin_box_value_changed"]
