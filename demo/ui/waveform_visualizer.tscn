@@ -1,6 +1,6 @@
 [gd_scene load_steps=2 format=3 uid="uid://t4jyo3xi7apn"]
 
-[ext_resource type="Script" path="res://addons/synth/ui/waveform_visualizer.gd" id="1_yxs60"]
+[ext_resource type="Script" path="res://demo/ui/waveform_visualizer.gd" id="1_yxs60"]
 
 [node name="Waveform" type="Node2D"]
 position = Vector2(378, 263)

@@ -1,6 +1,6 @@
 [gd_scene load_steps=2 format=3 uid="uid://cfuy6m1ob8e7n"]
 
-[ext_resource type="Script" path="res://addons/synth/ui/slider.gd" id="1_4vxkx"]
+[ext_resource type="Script" path="res://demo/ui/slider.gd" id="1_4vxkx"]
 
 [node name="Slider" type="HBoxContainer"]
 anchors_preset = 8
