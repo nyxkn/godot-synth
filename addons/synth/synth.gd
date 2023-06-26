@@ -11,7 +11,11 @@ const sample_rate: float = 44100
 #var sample_rate: float = 11025
 #var inv_sample_rate: float = 1.0 / sample_rate
 
+# buffer size for dsp computation
 const buffer_size: float = 512
+# multiples of the buffer size that we let the audio generator create in advance
+# the higher this is, the greater the latency
+const buffer_sizes_in_advance: int = 2
 
 enum FillMode { FRAME, CHUNK }
 const fill_mode = FillMode.CHUNK
@@ -25,6 +29,8 @@ var _phase: float = 0.0
 var _start_latency
 var _start_latency_full
 var _waveform_data: PackedVector2Array = []
+var _last_waveform_data: PackedVector2Array = []
+var _frames_available: int = 0
 
 var playing = false
 var pitch: float = 440
@@ -41,14 +47,10 @@ var filter: int = 0
 var resonance: float = 1.0
 
 
+var _thread: Thread
+
 func _ready():
-	if playing:
-		return
-
-	# disable vsync so _process is not bound
-	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
-
-	_phase = 0.0
+	_thread = Thread.new()
 
 	audio_stream_player = AudioStreamPlayer.new()
 	add_child(audio_stream_player)
@@ -56,25 +58,63 @@ func _ready():
 	audio_stream_player.stream.mix_rate = sample_rate
 	# how many seconds to buffer ahead. we want to keep this as low as possible to avoid latency
 	# length of buffer_size * 2 because less doesn't seem to keep up
-	audio_stream_player.stream.buffer_length = buffer_size / sample_rate * 2.0
-	print(str("buffer_length:", audio_stream_player.stream.buffer_length))
+	audio_stream_player.stream.buffer_length = (buffer_size) / sample_rate * buffer_sizes_in_advance
+	print(str("buffer length: ", audio_stream_player.stream.buffer_length))
+
 
 func start():
 	audio_stream_player.play()
 	audio_stream_player.stream_paused = true
 	audio_stream_player.seek(0.0)
 
+#	await get_tree().process_frame # needed?
+
 	audio_stream_generator = audio_stream_player.get_stream_playback()
 	# prefill, do before play() to avoid delay.
 	# actually that doesn't work. play() needs to be called first to be able to get stream playback
-	print(str("frames available:", audio_stream_generator.get_frames_available()))
-	fill_buffer()
+	print(str("frames available: ", audio_stream_generator.get_frames_available()))
+	fill_buffer(true)
 
-#	await get_tree().process_frame # needed?
+	playing = true
+	_thread.start(thread_loop, Thread.PRIORITY_NORMAL)
+
+
+func thread_loop():
+	_phase = 0.0
 	_start_latency = AudioServer.get_output_latency()
 	_start_latency_full = AudioServer.get_time_to_next_mix() + _start_latency
 	audio_stream_player.stream_paused = false
-	playing = true
+
+	var last_time = Time.get_ticks_usec()
+
+	print("thread start")
+
+	while playing:
+		if not audio_stream_player.playing:
+			if _frames_available == 0:
+				print("stream stopped. audio generator could not provide frames fast enough")
+			else:
+				print(str("stream stopped. we couldn't fill frames fast enough. frames available:", _frames_available))
+			playing = false
+			return
+
+		var delta = (Time.get_ticks_usec() - last_time) * pow(0.1, 6)
+#		print(delta)
+
+		fill_buffer()
+
+		last_time = Time.get_ticks_usec()
+#		OS.delay_usec(1)
+		OS.delay_msec(1)
+
+	print("thread end")
+
+	return "thread loop finished"
+
+
+func stop():
+	playing = false
+	print_debug(_thread.wait_to_finish())
 
 
 # swapping params. property last because bind() works from right to left
@@ -82,17 +122,50 @@ func set_property(value, property):
 	set(property, value)
 
 
-var elapsed = 0
-var process_call_counter = 0
-func _process(_delta):
-	# fps counter
-	elapsed += _delta
-	process_call_counter += 1
-	var fps = process_call_counter / elapsed
-#	print(fps)
+func fill_buffer(prefill = false):
+	_frames_available = audio_stream_generator.get_frames_available()
+	print(_frames_available)
 
-	if playing:
-		fill_buffer()
+	# when we use fill by frame, we process single frames as soon as they are available
+	# in chunk mode, we wait unti there's a big enough chunk
+	# frames become available in chunks anyway, seemingly 512 or 1024
+	# we are using (buffer_size -1) in chunk mode because audiogenerator seems to often generate buffer_size-1 frames. e.g. 255, 511
+	if (fill_mode == FillMode.FRAME and _frames_available > 0) or (fill_mode == FillMode.CHUNK and _frames_available >= buffer_size -1):
+		var to_fill
+		if prefill:
+			to_fill = _frames_available
+		else:
+			to_fill = min(_frames_available, buffer_size)
+
+		var buffer: PackedVector2Array = []
+		while to_fill > 0:
+			var sample = generate_waveform_sample(_phase)
+
+			if filter == 1:
+				sample = biquad(sample)
+
+			# audio frames we send to audioplayer need to be stereo: vector2(left, right)
+			var sample_stereo = sample * Vector2.ONE
+
+			if fill_mode == FillMode.CHUNK:
+				buffer.append(sample_stereo)
+			else:
+				audio_stream_generator.push_frame(sample_stereo)
+
+			to_fill -= 1
+			var increment = pitch / sample_rate
+			var new_phase = fmod(_phase + increment, 1.0)
+			if new_phase < _phase:
+				_last_waveform_data = _waveform_data.duplicate()
+				_waveform_data.clear()
+				call_deferred("emit_signal", "wave_cycle_completed", _last_waveform_data)
+			else:
+				_waveform_data.append(Vector2(_phase, sample))
+			_phase = new_phase
+
+		if fill_mode == FillMode.CHUNK:
+			audio_stream_generator.push_buffer(buffer)
+
 
 
 func sine(x):
@@ -118,44 +191,6 @@ func generate_waveform_sample(phase):
 	# y *= volume
 
 	return y
-
-
-func fill_buffer():
-	var frames_available = audio_stream_generator.get_frames_available()
-
-	# when we use fill by frame, we can also process this as soon as there are frames availabe
-	# instead of waiting for a whole buffer size
-	if frames_available >= buffer_size:
-		var to_fill = buffer_size
-
-		var buffer: PackedVector2Array = []
-		while to_fill > 0:
-			var sample = generate_waveform_sample(_phase)
-
-			if filter == 1:
-				sample = biquad(sample)
-
-			# audio frames we send to audioplayer need to be stereo: vector2(left, right)
-			var sample_stereo = sample * Vector2.ONE
-
-			if fill_mode == FillMode.CHUNK:
-				buffer.append(sample_stereo)
-			else:
-				audio_stream_generator.push_frame(sample_stereo)
-
-			to_fill -= 1
-			var increment = pitch / sample_rate
-			var new_phase = fmod(_phase + increment, 1.0)
-			if new_phase < _phase:
-				wave_cycle_completed.emit(_waveform_data)
-				_waveform_data.clear()
-			else:
-				_waveform_data.append(Vector2(_phase, sample))
-			_phase = new_phase
-
-		if fill_mode == FillMode.CHUNK:
-			audio_stream_generator.push_buffer(buffer)
-
 
 
 ## ================================
